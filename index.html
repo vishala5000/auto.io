@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quote Image Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            background-color: black; /* Solid black background for the website */
+            color: white; /* White text for better readability */
+        }
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            color: red; /* Red color for the title */
+        }
+        #quoteInput {
+            width: 90%;
+            max-width: 600px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #fff; /* White border */
+            border-radius: 4px;
+            background-color: red; /* Red background for input */
+            color: white; /* White text for input */
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background-color: red; /* Red buttons */
+            color: white;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: darkred; /* Darker red on hover */
+        }
+        #imagesContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+        .quoteImage {
+            max-width: 90%;
+            height: auto;
+            margin: 10px;
+            border: 1px solid white; /* White border for images */
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Quote Image Generator</h1>
+    <input type="text" id="quoteInput" placeholder='Enter quotes separated by commas (e.g., "Quote 1", "Quote 2")'>
+    <button id="generateButton" style="display:none;">Generate Images</button> <!-- Hidden button -->
+    <div id="imagesContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.rawgit.com/Kagami/ffmpeg.js/0.10.0/ffmpeg.min.js"></script>
+    <script>
+        const imagesContainer = document.getElementById('imagesContainer');
+        let images = [];
+
+        // Automatically generate 3 images when the page loads
+        window.onload = function() {
+            const quotes = [
+                "Quote 1",
+                "Quote 2",
+                "Quote 3"
+            ];
+
+            quotes.forEach((quote, index) => {
+                createImage(quote, index);  // Automatically generate 3 images
+            });
+
+            // Simulate that the images are ready for upload after generation
+            setTimeout(() => {
+                uploadToFacebook(images);  // Upload images after a delay
+            }, 3000);  // Wait 3 seconds before uploading images (adjust this time as needed)
+        };
+
+        function createImage(quote, index) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const size = 400; // Set canvas size for square images
+            canvas.width = size;
+            canvas.height = size;
+
+            // Load the background image from the same directory
+            const backgroundImage = new Image();
+            backgroundImage.src = 'bg.jpg'; // Ensure 'bg.jpg' is in the same directory
+
+            backgroundImage.onload = () => {
+                // Draw the background image
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = 'white'; // White text for quotes
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const maxWidth = size - 40; // Leave some padding
+                const words = quote.split(' ');
+                let line = '';
+                const lines = [];
+
+                words.forEach(word => {
+                    const testLine = line + word + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > maxWidth && line.length > 0) {
+                        lines.push(line);
+                        line = word + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                });
+                lines.push(line);
+
+                const lineHeight = 30;
+                const y = (canvas.height - (lines.length * lineHeight)) / 2 + lineHeight / 2;
+                lines.forEach((line, i) => {
+                    ctx.fillText(line, canvas.width / 2, y + i * lineHeight);
+                });
+
+                const imgURL = canvas.toDataURL('image/png');
+                const img = document.createElement('img');
+                img.src = imgURL;
+                img.className = 'quoteImage';
+                imagesContainer.appendChild(img);
+                images.push(imgURL); // Store image data as URL
+            };
+
+            backgroundImage.onerror = () => {
+                console.error("Failed to load the background image.");
+                alert("Failed to load the background image. Please check the file path.");
+            };
+        }
+
+        // Facebook Upload Function
+        function uploadToFacebook(images) {
+            const accessToken = 'your_facebook_page_access_token';
+            const pageId = 'your_facebook_page_id'; // Your Facebook Page ID
+
+            images.forEach((imageData, index) => {
+                const formData = new FormData();
+                formData.append('image', dataURItoBlob(imageData));
+                formData.append('access_token', accessToken);
+
+                fetch(`https://graph.facebook.com/${pageId}/photos`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Image uploaded successfully', data);
+                })
+                .catch(error => {
+                    console.error('Error uploading image:', error);
+                });
+            });
+        }
+
+        // Helper function to convert a base64 data URI to a Blob
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: 'image/png' });
+        }
+    </script>
+
+</body>
+</html>
